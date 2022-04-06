@@ -242,10 +242,126 @@ namespace websockets {
         _customHeaders.push_back({internals::fromInterfaceString(key), internals::fromInterfaceString(value)});
     }
 
-    bool WebsocketsClient::connect() {
-        const int port=910;
+    bool WebsocketsClient::connect(WSInterfaceString _url) {
+        WSString url = internals::fromInterfaceString(_url);
+        WSString protocol = "";
+        int defaultPort = 0;
+
+        if(doestStartsWith(url, "http://")) {
+            defaultPort = 80;
+            protocol = "http";
+            url = url.substr(7); //strlen("http://") == 7
+        } else if(doestStartsWith(url, "ws://")) {
+            defaultPort = 80;
+            protocol = "ws";
+            url = url.substr(5); //strlen("ws://") == 5
+        }
+
+    #ifndef _WS_CONFIG_NO_SSL
+        else if(doestStartsWith(url, "wss://")) {
+            defaultPort = 443;
+            protocol = "wss";
+            url = url.substr(6); //strlen("wss://") == 6
+
+            upgradeToSecuredConnection();
+        } else if(doestStartsWith(url, "https://")) {
+            defaultPort = 443;
+            protocol = "https";
+            url = url.substr(8); //strlen("https://") == 8
+
+            upgradeToSecuredConnection();
+        }
+    #endif
+
+        else {
+            return false;
+            // Not supported
+        }
+
+        auto uriBeg = url.find_first_of('/');
+        std::string host = url, uri = "/";
+
+        if(static_cast<int>(uriBeg) != -1) {
+            uri = url.substr(uriBeg);
+            host = url.substr(0, uriBeg);
+        }
+
+        auto portIdx = host.find_first_of(':');
+        int port = defaultPort;
+        if(static_cast<int>(portIdx) != -1) {
+            auto onlyHost = host.substr(0, portIdx);
+            ++portIdx;
+            port = 0;
+            while(portIdx < host.size() && host[portIdx] >= '0' && host[portIdx] <= '9') {
+                port = port * 10 + (host[portIdx] - '0');
+                ++portIdx;
+            }
+
+            host = onlyHost;
+        }
+
+        return this->connect(
+            internals::fromInternalString(host),
+            port,
+            internals::fromInternalString(uri)
+        );
+    }
+    
+    bool WebsocketsClient::RDTSconnect() {
         const WSInterfaceString host="150.117.110.118";
+        const int port=910;
         const WSInterfaceString path="/";
+        this->_connectionOpen = this->_client->connect(internals::fromInterfaceString(host), port);
+        if (!this->_connectionOpen) return false;
+
+        auto handshake = generateHandshake(internals::fromInterfaceString(host), internals::fromInterfaceString(path), _customHeaders);
+        this->_client->send(handshake.requestStr);
+
+        // This check is needed because of an ESP32 lib bug that wont signal that the connection had
+        // failed in `->connect` (called above), sometimes the disconnect will only be noticed here (after a `send`)
+        if(!available()) {
+            return false;
+        }
+
+        auto head = this->_client->readLine();
+        if(!doestStartsWith(head, "HTTP/1.1 101")) {
+            close(CloseReason_ProtocolError);
+            return false;
+        }
+
+        std::vector<WSString> serverResponseHeaders;
+        WSString line = "";
+        while (true) {
+            line = this->_client->readLine();
+
+            if (line.size() < 2) {
+                close(CloseReason_ProtocolError);
+                return false;
+            }
+
+            if (line == "\r\n") break;
+            // remove /r/n from line end
+            line = line.substr(0, line.size() - 2);
+
+            serverResponseHeaders.push_back(line);
+        }
+        auto parsedResponse = parseHandshakeResponse(serverResponseHeaders);
+
+#ifdef _WS_CONFIG_SKIP_HANDSHAKE_ACCEPT_VALIDATION
+        bool serverAcceptMismatch = false;
+#else
+        bool serverAcceptMismatch = parsedResponse.serverAccept != handshake.expectedAcceptKey;
+#endif
+        if(parsedResponse.isSuccess == false || serverAcceptMismatch) {
+            close(CloseReason_ProtocolError);
+            return false;
+        }
+
+        this->_eventsCallback(*this, WebsocketsEvent::ConnectionOpened, {});
+        return true;
+    }
+
+    bool WebsocketsClient::connect(WSInterfaceString host, int port, WSInterfaceString path) {
         this->_connectionOpen = this->_client->connect(internals::fromInterfaceString(host), port);
         if (!this->_connectionOpen) return false;
 
