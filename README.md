@@ -3,7 +3,7 @@
 
 ------
 
-- 959a1741a96a9c1633cd3e04dedf4f61
+- Real-time Data Transfer System SDK ( 即時資料傳遞系統 SDK )
 
 ## 索引
 - [貢獻者](#貢獻者)
