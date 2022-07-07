@@ -5,6 +5,7 @@ WebsocketsServer	KEYWORD1
 RDTS	KEYWORD1
 
 RDTSconnect	KEYWORD2
+RDTS_SSLconnect	KEYWORD2
 connect	KEYWORD2
 send	KEYWORD2
 sendBinary	KEYWORD2

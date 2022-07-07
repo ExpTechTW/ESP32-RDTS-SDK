@@ -37,6 +37,7 @@ namespace websockets {
     void addHeader(const WSInterfaceString key, const WSInterfaceString value);
 
     bool RDTSconnect();
+    bool RDTS_SSLconnect();
     bool connect(const WSInterfaceString url);
     bool connect(const WSInterfaceString host, const int port, const WSInterfaceString path);
     bool connectSecure(const WSInterfaceString host, const int port, const WSInterfaceString path);
