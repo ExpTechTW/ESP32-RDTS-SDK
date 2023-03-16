@@ -1,9 +1,9 @@
-# RDTS-SDK
+# RDTS-Lib
 <img alt="Discord" src="https://img.shields.io/discord/926545182407688273">
 
 ------
 
-- Real-time Data Transfer System SDK ( 即時資料傳遞系統 SDK )
+- Real-time Data Transfer System Library ( 即時資料傳遞系統 Library )
 
 ## 索引
 - [貢獻者](#貢獻者)
